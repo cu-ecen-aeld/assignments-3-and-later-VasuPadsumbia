@@ -65,7 +65,8 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-    
+    fflush(stdout); // Ensure stdout is flushed before forking
+    fflush(stderr); // Ensure stderr is flushed before forking
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");  
@@ -120,6 +121,8 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
     
+    fflush(stdout); // Ensure stdout is flushed before forking
+    fflush(stderr); // Ensure stderr is flushed before forking
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");
