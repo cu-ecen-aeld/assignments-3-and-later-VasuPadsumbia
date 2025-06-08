@@ -1,5 +1,7 @@
 #include "systemcalls.h"
 
+
+
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -16,6 +18,11 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int status = WEXITSTATUS(system(cmd));
+    if (status != 0)
+    {
+        return false;
+    }   
 
     return true;
 }
@@ -58,6 +65,27 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");  
+    }
+
+    if (pid == 0) {
+        // Child process
+        execv(command[0], command);
+        perror("execv failed");
+        exit(EXIT_FAILURE); // Exit child process if execv fails
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0); // Wait for child process to finish
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status) == 0; // Return true if exit status is 0
+        } else {
+            return false; // Return false if child did not exit normally
+        }
+    }
 
     va_end(args);
 
@@ -84,7 +112,6 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     // and may be removed
     command[count] = command[count];
 
-
 /*
  * TODO
  *   Call execv, but first using https://stackoverflow.com/a/13784315/1446624 as a refernce,
@@ -92,6 +119,43 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+    }
+
+    if (pid == 0) {
+        // Child process
+        FILE *file = fopen(outputfile, "w");
+        if (file == NULL) {
+            perror("Failed to open output file");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Redirect stdout to the file
+        if (dup2(fileno(file), STDOUT_FILENO) < 0) {
+            perror("dup2 failed");
+            fclose(file);
+            exit(EXIT_FAILURE);
+        }
+        
+        fclose(file); // Close the file descriptor after redirecting
+
+        execv(command[0], command);
+        perror("execv failed");
+        exit(EXIT_FAILURE); // Exit child process if execv fails
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0); // Wait for child process to finish
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status) == 0; // Return true if exit status is 0
+        } else {
+            return false; // Return false if child did not exit normally
+        }
+    }
+
 
     va_end(args);
 
