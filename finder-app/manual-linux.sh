@@ -167,6 +167,7 @@ mkdir -p ${OUTDIR}/rootfs/home
 cp ${FINDER_APP_DIR}/finder.sh ${OUTDIR}/rootfs/home/finder.sh
 cp ${FINDER_APP_DIR}/writer.elf ${OUTDIR}/rootfs/home/writer.elf
 cp ${FINDER_APP_DIR}/writer.o ${OUTDIR}/rootfs/home/writer.o
+cp ${FINDER_APP_DIR}/writer.sh ${OUTDIR}/rootfs/home/writer.sh
 cp ${FINDER_APP_DIR}/finder-test.sh ${OUTDIR}/rootfs/home/finder-test.sh
 cp ${FINDER_APP_DIR}/Makefile ${OUTDIR}/rootfs/home/Makefile
 cp ${FINDER_APP_DIR}/autorun-qemu.sh ${OUTDIR}/rootfs/home/autorun-qemu.sh
