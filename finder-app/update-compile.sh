@@ -1,3 +1,4 @@
+#!/bin/bash
 OUTDIR=/tmp/aeld
 
 if [ $# -lt 1 ]
