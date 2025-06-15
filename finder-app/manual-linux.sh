@@ -36,6 +36,8 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     git checkout ${KERNEL_VERSION}
 
     # TODO: Add your kernel build steps here
+    echo "Cleaning the kernel build directory"
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
     echo "Building the kernel"
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j4
@@ -134,12 +136,12 @@ cp -L ${SYSROOT}/lib64/libresolv.so.2 ${OUTDIR}/rootfs/lib/
 
 # TODO: Make device nodes
 echo "Creating device nodes"
-sudo mknod -m 666 ${OUTDIR}/rootfs/dev/console c 5 1
+sudo mknod -m 600 ${OUTDIR}/rootfs/dev/console c 5 1
 sudo mknod -m 666 ${OUTDIR}/rootfs/dev/null c 1 3
-sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty1 c 4 1
-sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty2 c 4 2
-sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty3 c 4 3
-sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty4 c 4 4
+#sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty1 c 4 1
+#sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty2 c 4 2
+#sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty3 c 4 3
+#sudo mknod -m 666 ${OUTDIR}/rootfs/dev/tty4 c 4 4
 
 # TODO: Clean and build the writer utility
 cd "$FINDER_APP_DIR"
