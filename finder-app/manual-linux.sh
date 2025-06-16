@@ -21,6 +21,29 @@ else
 	OUTDIR=$1
 	echo "Using passed directory ${OUTDIR} for output"
 fi
+if [ ! -d "/usr/local/arm-cross-compiler" ]; then
+    echo "Creating directory /usr/local/arm-cross-compiler"
+    mkdir -p /usr/local/arm-cross-compiler
+    chown $USER /usr/local/arm-cross-compiler
+else
+    echo "Directory /usr/local/arm-cross-compiler already exists"
+fi
+if [ ! -d "/usr/local/arm-cross-compiler/${GCC_ARM_VERSION}" ]; then
+    cd /usr/local/arm-cross-compiler
+    wget -O gcc-arm.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/$GCC_ARM_VERSION/binrel/arm-gnu-toolchain-$GCC_ARM_VERSION-x86_64-aarch64-none-linux-gnu.tar.xz
+    echo "Extracting gcc-arm.tar.xz to /usr/local/arm-cross-compiler/arm-cross-compiler/arm-gnu-toolchain-$GCC_ARM_VERSION-x86_64-aarch64-none-linux-gnu"
+    tar x -C /usr/local/arm-cross-compiler -f gcc-arm.tar.xz
+    rm -f gcc-arm.tar.xz
+    if [ -d "/usr/local/arm-cross-compiler/arm-gnu-toolchain-$GCC_ARM_VERSION-x86_64-aarch64-none-linux-gnu" ]; then
+        echo "Cross compiler extracted successfully to /usr/local/arm-cross-compiler/${GCC_ARM_VERSION}"
+        export PATH=/usr/local/arm-cross-compiler/arm-gnu-toolchain-$GCC_ARM_VERSION-x86_64-aarch64-none-linux-gnu/bin:$PATH
+        export CROSS_COMPILE=aarch64-none-linux-gnu-
+        export ARCH=arm64
+        echo "Cross compiler set to ${CROSS_COMPILE} for architecture ${ARCH}"  
+    fi
+else
+    echo "Directory /usr/local/arm-cross-compiler/${GCC_ARM_VERSION} already exists"
+fi  
 
 mkdir -p ${OUTDIR}
 
@@ -192,4 +215,3 @@ if [ ! -e ${OUTDIR}/initramfs.cpio.gz ]; then
 else
     echo "initramfs.cpio.gz created successfully."
 fi
-
