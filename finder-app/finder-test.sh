@@ -68,6 +68,7 @@ set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
 	echo "success"
+	$WORKDIR/writer.elf "/tmp/assignment4-result.txt" "${OUTPUTSTRING}"
 	exit 0
 else
 	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found"
