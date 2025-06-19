@@ -9,6 +9,7 @@ NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
 username=$(cat /etc/finder-app/conf/username.txt)
+WORKDIR=/usr/bin
 
 if [ $# -lt 3 ]
 then
@@ -55,10 +56,10 @@ fi
 for i in $( seq 1 $NUMFILES)
 do
 	echo "writing script executed is writer.elf"
-	./writer.elf "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	$WORKDIR/writer.elf "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
-OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+OUTPUTSTRING=$($WORKDIR/finder.sh "$WRITEDIR" "$WRITESTR")
 
 # remove temporary directories
 rm -rf /tmp/aeld-data
