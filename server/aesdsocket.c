@@ -39,6 +39,7 @@ void setup_signal_handlers() {
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
 }
+
 void setup_socket(int *sockfd, struct sockaddr_in *server_addr, char *server_ip) {
     // Create a socket using the provided argument as the protocol
     *sockfd = socket(AF_INET, SOCK_STREAM, 0);
