@@ -18,7 +18,7 @@ if [ "$ACTION" == "start" ]; then
     fi
     # Start the AESD socket service
     echo "Starting AESD socket service..."
-    ./aesdsocket &
+    /usr/bin/aesdsocket &
     if [ $? -eq 0 ]; then
         echo "AESD socket service started successfully."
     else
