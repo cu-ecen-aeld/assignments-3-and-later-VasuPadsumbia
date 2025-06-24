@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Start and stop the AESD socket service
 # Usage: ./aesdsocket-start-stop.sh start|stop
 # Set the action to start by default
