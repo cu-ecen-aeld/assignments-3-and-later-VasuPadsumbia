@@ -6,7 +6,11 @@ crosstool-ng
 aesd-build
 .vscode/
 test.sh.log
+<<<<<<< HEAD
 aesdsocket
+=======
+actions-runner/
+>>>>>>> 395a673 (action_runner removed)
 server/aesdsocket
 server/valgrind-out.txt
 actions-runner/
