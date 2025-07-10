@@ -32,7 +32,35 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     /**
     * TODO: implement per description
     */
-    return NULL;
+    if (buffer == NULL || entry_offset_byte_rtn == NULL) {
+        return NULL; // Invalid parameters
+    }
+    size_t total_size = 0;
+    size_t i;
+    uint8_t index = buffer->out_offs;   
+    // Iterate through the circular buffer entries
+    for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+        // Get the current entry
+        struct aesd_buffer_entry *entry = &buffer->entry[index];
+        // Check if the entry is valid
+        if (entry->buffptr != NULL) {
+            // Check if the char_offset is within the current entry
+            if (char_offset < total_size + entry->size) {
+                // Calculate the byte offset within the entry
+                *entry_offset_byte_rtn = char_offset - total_size;
+                return entry; // Return the found entry
+            }
+            // Update the total size with the current entry size
+            total_size += entry->size;
+        }
+        // Move to the next entry in the circular buffer
+        index = (index + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+        // If we have wrapped around and reached the out_offs, break
+        if (index == buffer->out_offs) {
+            break; // No more entries to check
+        }
+    }
+    return NULL; // No matching entry found
 }
 
 /**
@@ -47,6 +75,72 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+    if (!buffer || !add_entry) {
+        return; // Invalid parameters
+    }
+    // Check if the buffer is full
+    if (buffer->full) {
+        // Overwrite the oldest entry
+        buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    }   
+    // Add the new entry at the current in_offs position
+    buffer->entry[buffer->in_offs] = *add_entry;
+    // Move in_offs to the next position
+    buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;  
+    // Check if we have wrapped around and filled the buffer
+    if (buffer->in_offs == buffer->out_offs) {
+        buffer->full = true; // Buffer is now full
+    } else {
+        buffer->full = false; // Buffer is not full
+    }
+    // Ensure in_offs and out_offs are within bounds
+    //buffer->in_offs %= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    //buffer->out_offs %= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    //// Ensure the entries are valid
+    //for (size_t i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++) {
+    //    if (buffer->entry[i].buffptr == NULL) {
+    //        buffer->entry[i].size = 0; // Reset size for uninitialized entries  
+    //    } else {
+    //        // Ensure size is within bounds
+    //        if (buffer->entry[i].size > AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
+    //        {
+    //            buffer->entry[i].size = AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; // Cap size to max supported
+    //        }
+    //    }
+    //}
+    //// Ensure the buffer is initialized correctly
+    //if (buffer->in_offs == buffer->out_offs && !buffer->full) {
+    //    buffer->full = false; // Buffer is not full if in_offs equals out_offs
+    //}
+    //if (buffer->in_offs == 0 && buffer->out_offs == 0 && !buffer->full) {
+    //    // If both in_offs and out_offs are zero, the buffer is empty
+    //    buffer->full = false; // Buffer is empty    
+    //}
+    //if (buffer->in_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED || buffer->out_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+    //    // Ensure in_offs and out_offs are within bounds
+    //    buffer->in_offs = 0;
+    //    buffer->out_offs = 0;
+    //    buffer->full = false; // Reset full status
+    //}
+    //// Ensure the buffer is in a valid state
+    //if (buffer->in_offs < 0 || buffer->in_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED ||
+    //    buffer->out_offs < 0 || buffer->out_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+    //    // Reset the buffer if indices are out of bounds
+    //    buffer->in_offs = 0;
+    //    buffer->out_offs = 0;
+    //    buffer->full = false; // Reset full status
+    //}
+    //// Ensure the buffer is not in an invalid state
+    //if (buffer->in_offs == buffer->out_offs && buffer->full) {
+    //    // If in_offs equals out_offs and the buffer is full, reset the full status
+    //    buffer->full = false; // Reset full status
+    //}
+    //if (buffer->in_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+    //    buffer->in_offs = 0; // Wrap around in_offs
+    //}
+    //if (buffer->out_offs == AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+    //    buffer->out_offs = 0; // Wrap around out_offs
+    //}    
 }
 
 /**
