@@ -49,16 +49,16 @@ Code: d2800001 d2800000 d503233f d50323bf (b900003f)
 ---[ end trace 0000000000000000 ]---
 ```
 ## Analysis
-The kernel oops occurred due to a NULL pointer dereference inside the faulty_write() function of the faulty kernel module.
-The echo command attempted to write to /dev/faulty, triggering the write() system call.
-This call eventually invoked the faulty_write() handler in the kernel module, which was intentionally written to dereference a NULL pointer.
-The instruction b900003f in the crash dump is a str wzr, [x1] ARM64 instruction, which tries to write to an address stored in register x1. Since x1 was 0x0, this resulted in a crash.
+-The kernel oops occurred due to a NULL pointer dereference inside the faulty_write() function of the faulty kernel module.
+-The echo command attempted to write to /dev/faulty, triggering the write() system call.
+-This call eventually invoked the faulty_write() handler in the kernel module, which was intentionally written to dereference a NULL pointer.
+-The instruction b900003f in the crash dump is a str wzr, [x1] ARM64 instruction, which tries to write to an address stored in register x1. Since x1 was 0x0, this resulted in a crash.
 
 ## Educational Purpose
-This kernel module is designed to demonstrate how a faulty driver can crash the entire system.
-It is used to teach how critical memory safety is in kernel space, where even small mistakes like dereferencing a NULL pointer can lead to unrecoverable crashes.
+-This kernel module is designed to demonstrate how a faulty driver can crash the entire system.
+-It is used to teach how critical memory safety is in kernel space, where even small mistakes like dereferencing a NULL pointer can lead to unrecoverable crashes.
 
 ## Lessons Learned
-Never trust user input blindly in kernel space.
-Always validate pointers before dereferencing.
-Use defensive programming practices when writing kernel modules.
+-Never trust user input blindly in kernel space.
+-Always validate pointers before dereferencing.
+-Use defensive programming practices when writing kernel modules.
