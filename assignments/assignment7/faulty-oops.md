@@ -47,7 +47,7 @@ Call trace:
  el0t_64_sync+0x18c/0x190
 Code: d2800001 d2800000 d503233f d50323bf (b900003f) 
 ---[ end trace 0000000000000000 ]---
-
+```
 ## Analysis
 The kernel oops occurred due to a NULL pointer dereference inside the faulty_write() function of the faulty kernel module.
 The echo command attempted to write to /dev/faulty, triggering the write() system call.
