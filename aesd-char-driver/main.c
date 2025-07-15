@@ -184,12 +184,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         // Copy the data up to and including the newline character
         memcpy(new_entry.buffptr, dev->_partial_write_buffer, entry_size);
         // Add the new entry to the circular buffer
-        const struct aesd_buffer_entry *old_entry;
-        old_entry = aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
-
-        if (old_entry && old_entry->buffptr) {
-            kfree(old_entry->buffptr);  // free the old overwritten entry
-        }
+        // ✅ free the overwritten slot if full
+        struct aesd_buffer_entry *about_to_be_overwritten =
+            &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
+            
+        if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
+            kfree(about_to_be_overwritten->buffptr);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
         // Remove the processed data from the partial write buffer
         size_t remaining_size = dev->_partial_write_size - entry_size;
