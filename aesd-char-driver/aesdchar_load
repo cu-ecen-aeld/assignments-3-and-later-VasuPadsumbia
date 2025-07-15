@@ -4,6 +4,13 @@ device=aesdchar
 mode="664"
 cd `dirname $0`
 set -e
+MODULE_PATH=$1
+if [ -z "$MODULE_PATH" ]; then
+    echo "module path not specified, using current directory"
+    MODULE_PATH="."
+else
+    echo "Using module path: $MODULE_PATH"
+fi
 # Group: since distributions do it differently, look for wheel or use staff
 if grep -q '^staff:' /etc/group; then
     group="staff"
@@ -13,7 +20,7 @@ fi
 
 if [ -e ${module}.ko ]; then
     echo "Loading local built file ${module}.ko"
-    insmod ./$module.ko $* || exit 1
+    insmod ${MODULE_PATH}/$module.ko $* || exit 1
 else
     echo "Local file ${module}.ko not found, attempting to modprobe"
     modprobe ${module} || exit 1
