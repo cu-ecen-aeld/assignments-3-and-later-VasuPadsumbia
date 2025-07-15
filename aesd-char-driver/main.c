@@ -165,6 +165,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     dev->_partial_write_size = new_size; // Update the size of the partial write buffer
     PDEBUG("aesd_write: partial write buffer updated, size = %zu", dev->_partial_write_size);
     kfree(kbuf); // Free the temporary buffer
+    size_t processed = 0; // Number of bytes processed
     char *newline_pos = NULL;
     while ((newline_pos = memchr(dev->_partial_write_buffer, '\n', dev->_partial_write_size))) {
         // Found a newline, we can add the entry to the circular buffer
@@ -213,12 +214,13 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             kfree(dev->_partial_write_buffer);
             dev->_partial_write_buffer = NULL; // Reset the partial write buffer
         }
-        retval = entry_size; // Return the size of the new entry added
+        processed += entry_size; // Return the size of the new entry added
     } 
     mutex_unlock(&dev->lock); // Unlock the device
     PDEBUG("aesd_write: lock released");
     // Return the number of bytes written
     PDEBUG("aesd_write: returning %zd bytes", retval);
+    retval = count; // Return the number of bytes written
     if (retval < 0) {
         // If there was an error, free the partial write buffer if it exists
         if (dev->_partial_write_buffer) {
