@@ -84,7 +84,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
             oldest_entry->buffptr = NULL; // Set pointer to NULL after freeing
         }
         // Overwrite the oldest entry
-        //buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+        buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
     }   
     // Add the new entry at the current in_offs position
     buffer->entry[buffer->in_offs] = *add_entry;
