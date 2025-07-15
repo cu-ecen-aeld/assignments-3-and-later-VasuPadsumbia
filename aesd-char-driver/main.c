@@ -18,10 +18,11 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
+
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
 
-MODULE_AUTHOR("Your Name Here"); /** TODO: fill in your name **/
+MODULE_AUTHOR("Vasu Padsumbia"); /** TODO: fill in your name **/
 MODULE_LICENSE("Dual BSD/GPL");
 
 struct aesd_dev aesd_device;
@@ -32,6 +33,10 @@ int aesd_open(struct inode *inode, struct file *filp)
     /**
      * TODO: handle open
      */
+    struct aesd_dev *dev;
+    dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
+    filp->private_data = dev; // for other methods to access
+    PDEBUG("aesd_open: private_data = %p", filp->private_data);
     return 0;
 }
 
@@ -41,6 +46,18 @@ int aesd_release(struct inode *inode, struct file *filp)
     /**
      * TODO: handle release
      */
+    struct aesd_dev *dev = filp->private_data;
+    if (dev == NULL) {
+        PDEBUG("aesd_release: private_data is NULL");
+        return -ENODEV; // Device not found
+    }
+    PDEBUG("aesd_release: private_data = %p", dev);
+    filp->private_data = NULL; // Clear private data
+    // Additional cleanup if necessary
+    PDEBUG("aesd_release: private_data cleared");
+    mutex_unlock(&dev->lock); // Example if you had a lock
+    PDEBUG("aesd_release: completed");
+    // Return success
     return 0;
 }
 
@@ -52,6 +69,44 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     /**
      * TODO: handle read
      */
+    struct aesd_buffer_entry *entry;
+    size_t entry_offset_byte;
+    struct aesd_dev *dev = filp->private_data;
+    if (dev == NULL) {
+        PDEBUG("aesd_read: private_data is NULL");
+        return -ENODEV; // Device not found
+    }
+    PDEBUG("aesd_read: private_data = %p", dev);
+    // Lock the device for reading
+    mutex_lock(&dev->lock);
+    PDEBUG("aesd_read: lock acquired"); 
+    // Find the entry for the given file position
+    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->_circular_buffer, *f_pos, &entry_offset_byte);
+    if (entry == NULL) {
+        PDEBUG("aesd_read: no entry found for f_pos %lld", *f_pos);
+        mutex_unlock(&dev->lock); // Unlock before returning
+        return 0; // No data available
+    }
+    PDEBUG("aesd_read: found entry at offset %zu", entry_offset_byte);
+    // Check if the requested count exceeds the entry size
+    if (count > entry->size - entry_offset_byte) {
+        count = entry->size - entry_offset_byte; // Adjust count to available data
+    }
+    PDEBUG("aesd_read: adjusted count = %zu", count);
+    // Copy data from the entry to user space
+    if (copy_to_user(buf, entry->buffptr + entry_offset_byte, count)) {
+        PDEBUG("aesd_read: copy_to_user failed");
+        mutex_unlock(&dev->lock); // Unlock before returning
+        return -EFAULT; // Failed to copy data to user space
+    }
+    PDEBUG("aesd_read: copy_to_user succeeded");
+    // Update the file position
+    *f_pos += count;
+    PDEBUG("aesd_read: updated f_pos = %lld", *f_pos);
+    retval = count; // Return the number of bytes read
+    mutex_unlock(&dev->lock); // Unlock the device
+    PDEBUG("aesd_read: lock released");
+    // Return the number of bytes read
     return retval;
 }
 
@@ -63,6 +118,99 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     /**
      * TODO: handle write
      */
+    char *kbuf;
+    struct aesd_dev *dev = filp->private_data;
+    if (dev == NULL) {
+        PDEBUG("aesd_write: private_data is NULL");
+        return -ENODEV; // Device not found
+    }  
+    PDEBUG("aesd_write: private_data = %p", dev);
+    kbuf = kmalloc(count, GFP_KERNEL);
+    if (kbuf == NULL) {
+        PDEBUG("aesd_write: kmalloc failed");
+        return -ENOMEM; // Memory allocation failed
+    }
+    // Copy data from user space to kernel space
+    if (copy_from_user(kbuf, buf, count)) {
+        PDEBUG("aesd_write: copy_from_user failed");
+        kfree(kbuf); // Free allocated memory
+        return -EFAULT; // Failed to copy data from user space
+    }
+    PDEBUG("aesd_write: copy_from_user succeeded");
+    // Lock the device for writing
+    mutex_lock(&dev->lock);
+    PDEBUG("aesd_write: lock acquired");
+    
+    size_t new_size = dev->_partial_write_size + count;
+    char *combined_buffer = kmalloc(new_size, GFP_KERNEL);
+    if (combined_buffer == NULL) {
+        PDEBUG("aesd_write: kmalloc for combined_buffer failed");
+        mutex_unlock(&dev->lock); // Unlock before returning
+        kfree(kbuf); // Free allocated memory
+        return -ENOMEM; // Memory allocation failed
+    }
+    // Copy the existing partial write buffer if it exists
+    if (dev->_partial_write_buffer) {
+        memcpy(combined_buffer, dev->_partial_write_buffer, dev->_partial_write_size);
+    }
+    // Copy the new data into the combined buffer
+    memcpy(combined_buffer + dev->_partial_write_size, kbuf, count);
+    dev->_partial_write_buffer = combined_buffer; // Update the partial write buffer
+    dev->_partial_write_size = new_size; // Update the size of the partial write buffer
+    PDEBUG("aesd_write: partial write buffer updated, size = %zu", dev->_partial_write_size);
+    kfree(kbuf); // Free the temporary buffer
+
+    char *newline_pos = memchr(dev->_partial_write_buffer, '\n', dev->_partial_write_size);
+    if (newline_pos) {
+        // Found a newline, we can add the entry to the circular buffer
+        size_t entry_size = (newline_pos - dev->_partial_write_buffer) + 1; // Include the newline character
+        struct aesd_buffer_entry new_entry;
+        new_entry.buffptr = kmalloc(entry_size, GFP_KERNEL);
+        if (new_entry.buffptr == NULL) {
+            PDEBUG("aesd_write: kmalloc for new_entry.buffptr failed");
+            kfree(dev->_partial_write_buffer); // Free the partial write buffer
+            dev->_partial_write_buffer = NULL; // Reset the partial write buffer
+            dev->_partial_write_size = 0; // Reset the size
+            mutex_unlock(&dev->lock); // Unlock before returning
+            return -ENOMEM; // Memory allocation failed
+        }
+        new_entry.size = entry_size;
+        // Copy the data up to and including the newline character
+        memcpy(new_entry.buffptr, dev->_partial_write_buffer, entry_size);
+        // Add the new entry to the circular buffer
+        aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
+        PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
+        // Remove the processed data from the partial write buffer
+        size_t remaining_size = dev->_partial_write_size - entry_size;
+        if (remaining_size > 0) {
+            // Move the remaining data to the start of the buffer
+            memmove(dev->_partial_write_buffer, newline_pos + 1, remaining_size);
+        }
+        // Update the partial write buffer size
+        dev->_partial_write_size = remaining_size;
+        if (remaining_size == 0) {
+            // If no data remains, free the partial write buffer
+            kfree(dev->_partial_write_buffer);
+            dev->_partial_write_buffer = NULL; // Reset the partial write buffer
+        }
+        retval = entry_size; // Return the size of the new entry added
+    } else {
+        // No newline found, just return the size of the data written
+        retval = count;
+        PDEBUG("aesd_write: no newline found, returning count = %zd", retval);
+    }
+    mutex_unlock(&dev->lock); // Unlock the device
+    PDEBUG("aesd_write: lock released");
+    // Return the number of bytes written
+    PDEBUG("aesd_write: returning %zd bytes", retval);
+    if (retval < 0) {
+        // If there was an error, free the partial write buffer if it exists
+        if (dev->_partial_write_buffer) {
+            kfree(dev->_partial_write_buffer);
+            dev->_partial_write_buffer = NULL; // Reset the partial write buffer
+            dev->_partial_write_size = 0; // Reset the size
+        }
+    }
     return retval;
 }
 struct file_operations aesd_fops = {
@@ -105,6 +253,11 @@ int aesd_init_module(void)
     /**
      * TODO: initialize the AESD specific portion of the device
      */
+    aesd_circular_buffer_init(&aesd_device._circular_buffer);
+    mutex_init(&aesd_device.lock); // Example if you had a lock
+    aesd_device._partial_write_buffer = NULL; // Initialize partial write buffer
+    aesd_device._partial_write_size = 0; // Initialize partial write size
+    aesd_device._device = NULL; // Initialize device structure for sysfs
 
     result = aesd_setup_cdev(&aesd_device);
 
@@ -124,7 +277,20 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
-
+    struct aesd_buffer_entry *entry;
+    int i;
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, &aesd_device._circular_buffer, i) {
+        if (entry->buffptr != NULL) {
+            kfree(entry->buffptr); // Free the buffer memory
+            entry->buffptr = NULL; // Set pointer to NULL after freeing
+        }
+    }
+    kfree(aesd_device._partial_write_buffer); // Free the partial write buffer
+    mutex_destroy(&aesd_device.lock); // Destroy the mutex
+    cdev_del(&aesd_device.cdev); // Delete the character device
+    if (aesd_device._device) {
+        device_destroy(aesd_device._device->class, MKDEV(aesd_major, aesd_minor));
+    }
     unregister_chrdev_region(devno, 1);
 }
 

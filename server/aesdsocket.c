@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
     while ((opt = getopt(argc, argv, "d")) != -1) {
         if (opt == 'd') run_as_daemon = true;
     }
-    unlink(AESD_SOCKET_FILE); // Remove the socket file if it exists
+    //unlink(AESD_SOCKET_FILE); // Remove the socket file if it exists
     if (run_as_daemon) {
         daemonize();
     }
@@ -90,16 +90,16 @@ int main(int argc, char *argv[]) {
     
     global_server_socket_fd = conn_info->_sockfd;
 
-    pthread_t timestamp_thread;
-    pthread_create(&timestamp_thread, NULL, timestamp, NULL);
-    LOG_SYS("Timestamp thread started");
+    //pthread_t timestamp_thread;
+    //pthread_create(&timestamp_thread, NULL, timestamp, NULL);
+    //LOG_SYS("Timestamp thread started");
     client_handler(conn_info);
-    pthread_cancel(timestamp_thread);
+    //pthread_cancel(timestamp_thread);
     if (conn_info->_sockfd >= 0) {
         close(conn_info->_sockfd);
     }
 
-    pthread_join(timestamp_thread, NULL);
+    //pthread_join(timestamp_thread, NULL);
 
     thread_node_t *node;
     while (!SLIST_EMPTY(&thread_list)) {
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
     free_connection_info(conn_info);
     pthread_mutex_destroy(&file_mutex);
 
-    unlink(AESD_SOCKET_FILE);
+    //unlink(AESD_SOCKET_FILE);
 
     return EXIT_SUCCESS;
 }

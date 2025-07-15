@@ -26,7 +26,7 @@
 
 #define MY_PORT 9000
 #define BACKLOG 10
-#define AESD_SOCKET_FILE "/var/tmp/aesdsocketdata.txt"
+#define AESD_SOCKET_FILE "/dev/aesdchar"
 #define BUFFER_SIZE 1024
 
 #define LOG_SYS(fmt, ...) fprintf(stdout, "[SYS]: " fmt "\n", ##__VA_ARGS__)
@@ -113,5 +113,6 @@ size_t read_from_file(const char *filename, char *buffer, size_t buffer_size); /
 void setup_signal_handlers(); // Function to set up signal handlers for graceful shutdown
 void handle_signal(int signo); // Signal handler function to handle termination signals
 
+void stream_file_reader(const char *filename, int client_socket); // Function to read a file and stream its content to the client
 struct connection_info *create_connection_info(int sockfd, struct sockaddr_in *addr, char *ip);
 #endif // CLIENT_H
