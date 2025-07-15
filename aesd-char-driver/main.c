@@ -161,11 +161,11 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     }
     // Copy the new data into the combined buffer
     memcpy(combined_buffer + dev->_partial_write_size, kbuf, count);
+    kfree(dev->_partial_write_buffer); // Free the old partial write buffer
     dev->_partial_write_buffer = combined_buffer; // Update the partial write buffer
     dev->_partial_write_size = new_size; // Update the size of the partial write buffer
     PDEBUG("aesd_write: partial write buffer updated, size = %zu", dev->_partial_write_size);
     kfree(kbuf); // Free the temporary buffer
-    size_t processed = 0; // Number of bytes processed
     char *newline_pos = NULL;
     while ((newline_pos = memchr(dev->_partial_write_buffer, '\n', dev->_partial_write_size))) {
         // Found a newline, we can add the entry to the circular buffer
@@ -188,7 +188,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         // free the overwritten slot if full
         //struct aesd_buffer_entry *about_to_be_overwritten =
         //    &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
-//
+        //
         //if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
         //    kfree(about_to_be_overwritten->buffptr);
         if (dev->_circular_buffer.full) {
@@ -214,21 +214,20 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             kfree(dev->_partial_write_buffer);
             dev->_partial_write_buffer = NULL; // Reset the partial write buffer
         }
-        processed += entry_size; // Return the size of the new entry added
     } 
     mutex_unlock(&dev->lock); // Unlock the device
     PDEBUG("aesd_write: lock released");
     // Return the number of bytes written
     PDEBUG("aesd_write: returning %zd bytes", retval);
     retval = count; // Return the number of bytes written
-    if (retval < 0) {
-        // If there was an error, free the partial write buffer if it exists
-        if (dev->_partial_write_buffer) {
-            kfree(dev->_partial_write_buffer);
-            dev->_partial_write_buffer = NULL; // Reset the partial write buffer
-            dev->_partial_write_size = 0; // Reset the size
-        }
-    }
+    //if (retval < 0) {
+    //    // If there was an error, free the partial write buffer if it exists
+    //    if (dev->_partial_write_buffer) {
+    //        kfree(dev->_partial_write_buffer);
+    //        dev->_partial_write_buffer = NULL; // Reset the partial write buffer
+    //        dev->_partial_write_size = 0; // Reset the size
+    //    }
+    //}
     return retval;
 }
 struct file_operations aesd_fops = {
@@ -305,7 +304,7 @@ void aesd_cleanup_module(void)
     }
     kfree(aesd_device._partial_write_buffer); // Free the partial write buffer
     mutex_destroy(&aesd_device.lock); // Destroy the mutex
-    cdev_del(&aesd_device.cdev); // Delete the character device
+    //cdev_del(&aesd_device.cdev); // Delete the character device
     if (aesd_device._device) {
         device_destroy(aesd_device._device->class, MKDEV(aesd_major, aesd_minor));
     }
