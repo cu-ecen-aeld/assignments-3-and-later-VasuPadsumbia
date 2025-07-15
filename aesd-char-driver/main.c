@@ -69,8 +69,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     /**
      * TODO: handle read
      */
-    struct aesd_buffer_entry *entry;
-    size_t entry_offset_byte;
+    
     struct aesd_dev *dev = filp->private_data;
     if (dev == NULL) {
         PDEBUG("aesd_read: private_data is NULL");
@@ -81,29 +80,36 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
     mutex_lock(&dev->lock);
     PDEBUG("aesd_read: lock acquired"); 
     // Find the entry for the given file position
-    entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->_circular_buffer, *f_pos, &entry_offset_byte);
-    if (entry == NULL) {
-        PDEBUG("aesd_read: no entry found for f_pos %lld", *f_pos);
-        mutex_unlock(&dev->lock); // Unlock before returning
-        return 0; // No data available
+    while (count > 0)
+    {
+        struct aesd_buffer_entry *entry;
+        size_t entry_offset_byte;
+        entry = aesd_circular_buffer_find_entry_offset_for_fpos(&dev->_circular_buffer, *f_pos, &entry_offset_byte);
+        if (entry == NULL) {
+            PDEBUG("aesd_read: no entry found for f_pos %lld", *f_pos);
+            mutex_unlock(&dev->lock); // Unlock before returning
+            break; // No data available
+        }
+        PDEBUG("aesd_read: found entry at offset %zu", entry_offset_byte);
+        size_t bytes_left_in_entry = entry->size - entry_offset_byte;
+        size_t to_copy = (count < bytes_left_in_entry) ? count : bytes_left_in_entry;
+
+        PDEBUG("aesd_read: copying %zu bytes (entry_offset_byte = %zu, entry size = %zu)", to_copy, entry_offset_byte, entry->size);
+        // Copy data from the entry to user space
+        if (copy_to_user(buf, entry->buffptr + entry_offset_byte, count)) {
+            PDEBUG("aesd_read: copy_to_user failed");
+            mutex_unlock(&dev->lock); // Unlock before returning
+            return -EFAULT; // Failed to copy data to user space
+        }
+        PDEBUG("aesd_read: copy_to_user succeeded");
+        // Update the file position
+        *f_pos += to_copy;
+        buf += to_copy; // Move the buffer pointer forward
+        count -= to_copy; // Decrease the count of bytes left to read
+        retval += to_copy; // Update the return value with the number of bytes read
+        PDEBUG("aesd_read: updated count = %zu, retval = %zd", count, retval);
     }
-    PDEBUG("aesd_read: found entry at offset %zu", entry_offset_byte);
-    // Check if the requested count exceeds the entry size
-    if (count > entry->size - entry_offset_byte) {
-        count = entry->size - entry_offset_byte; // Adjust count to available data
-    }
-    PDEBUG("aesd_read: adjusted count = %zu", count);
-    // Copy data from the entry to user space
-    if (copy_to_user(buf, entry->buffptr + entry_offset_byte, count)) {
-        PDEBUG("aesd_read: copy_to_user failed");
-        mutex_unlock(&dev->lock); // Unlock before returning
-        return -EFAULT; // Failed to copy data to user space
-    }
-    PDEBUG("aesd_read: copy_to_user succeeded");
-    // Update the file position
-    *f_pos += count;
-    PDEBUG("aesd_read: updated f_pos = %lld", *f_pos);
-    retval = count; // Return the number of bytes read
+    
     mutex_unlock(&dev->lock); // Unlock the device
     PDEBUG("aesd_read: lock released");
     // Return the number of bytes read
@@ -178,7 +184,12 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         // Copy the data up to and including the newline character
         memcpy(new_entry.buffptr, dev->_partial_write_buffer, entry_size);
         // Add the new entry to the circular buffer
-        aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
+        const struct aesd_buffer_entry *old_entry;
+        old_entry = aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
+
+        if (old_entry && old_entry->buffptr) {
+            kfree(old_entry->buffptr);  // free the old overwritten entry
+        }
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
         // Remove the processed data from the partial write buffer
         size_t remaining_size = dev->_partial_write_size - entry_size;
