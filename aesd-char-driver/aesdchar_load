@@ -2,7 +2,7 @@
 module=aesdchar
 device=aesdchar
 mode="664"
-cd `dirname $0`
+#cd `dirname $0`
 set -e
 MODULE_PATH=$1
 if [ -z "$MODULE_PATH" ]; then
