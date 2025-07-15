@@ -96,7 +96,7 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
         PDEBUG("aesd_read: copying %zu bytes (entry_offset_byte = %zu, entry size = %zu)", to_copy, entry_offset_byte, entry->size);
         // Copy data from the entry to user space
-        if (copy_to_user(buf, entry->buffptr + entry_offset_byte, count)) {
+        if (copy_to_user(buf, entry->buffptr + entry_offset_byte, to_copy)) {
             PDEBUG("aesd_read: copy_to_user failed");
             mutex_unlock(&dev->lock); // Unlock before returning
             return -EFAULT; // Failed to copy data to user space
@@ -187,7 +187,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         // ✅ free the overwritten slot if full
         struct aesd_buffer_entry *about_to_be_overwritten =
             &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
-            
+
         if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
             kfree(about_to_be_overwritten->buffptr);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);

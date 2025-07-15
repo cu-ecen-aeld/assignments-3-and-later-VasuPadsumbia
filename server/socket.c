@@ -159,14 +159,14 @@ void *data_processing(void* socket_processing) {
             sp->connection_active = false; // Set connection_active flag to false
             pthread_mutex_lock(sp->packet->mutex); // Lock the mutex for thread safety
             // Stream the file content to the client
-            stream_file_reader(AESD_SOCKET_FILE, sp->connection_info->_sockfd); // Stream the file content to the client
+            //stream_file_reader(AESD_SOCKET_FILE, sp->connection_info->_sockfd); // Stream the file content to the client
             
             // Read the file and send the response to the client seperately for multiple servers
-            //size_t bytes_read = read_from_file(AESD_SOCKET_FILE, response, sizeof(response)); // Read data from file
-            ////LOG_DEBUG("Response: %s", response); // Log the response data
-            //if (send(sp->connection_info->_sockfd, response, bytes_read, MSG_NOSIGNAL) < 0) {
-            //    LOG_ERR("Failed to send response to client %s:%d: %s", sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port), strerror(errno));
-            //}
+            size_t bytes_read = read_from_file(AESD_SOCKET_FILE, response, sizeof(response)); // Read data from file
+            //LOG_DEBUG("Response: %s", response); // Log the response data
+            if (send(sp->connection_info->_sockfd, response, bytes_read, MSG_NOSIGNAL) < 0) {
+                LOG_ERR("Failed to send response to client %s:%d: %s", sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port), strerror(errno));
+            }
             pthread_mutex_unlock(sp->packet->mutex); // Unlock the mutex after sending the response
         }
     }   
