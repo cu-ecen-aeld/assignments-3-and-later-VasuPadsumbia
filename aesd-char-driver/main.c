@@ -124,14 +124,14 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     /**
      * TODO: handle write
      */
-    char *kbuf;
+    
     struct aesd_dev *dev = filp->private_data;
     if (dev == NULL) {
         PDEBUG("aesd_write: private_data is NULL");
         return -ENODEV; // Device not found
     }  
     PDEBUG("aesd_write: private_data = %p", dev);
-    kbuf = kmalloc(count, GFP_KERNEL);
+    char *kbuf = kmalloc(count, GFP_KERNEL);
     if (kbuf == NULL) {
         PDEBUG("aesd_write: kmalloc failed");
         return -ENOMEM; // Memory allocation failed
@@ -158,18 +158,21 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     // Copy the existing partial write buffer if it exists
     if (dev->_partial_write_buffer) {
         memcpy(combined_buffer, dev->_partial_write_buffer, dev->_partial_write_size);
+        kfree(dev->_partial_write_buffer); // Free the old partial write buffer
     }
     // Copy the new data into the combined buffer
     memcpy(combined_buffer + dev->_partial_write_size, kbuf, count);
-    kfree(dev->_partial_write_buffer); // Free the old partial write buffer
+    kfree(kbuf); // Free the temporary buffer
+    
     dev->_partial_write_buffer = combined_buffer; // Update the partial write buffer
     dev->_partial_write_size = new_size; // Update the size of the partial write buffer
     PDEBUG("aesd_write: partial write buffer updated, size = %zu", dev->_partial_write_size);
-    kfree(kbuf); // Free the temporary buffer
+    
     char *newline_pos = NULL;
     while ((newline_pos = memchr(dev->_partial_write_buffer, '\n', dev->_partial_write_size))) {
         // Found a newline, we can add the entry to the circular buffer
         size_t entry_size = (newline_pos - dev->_partial_write_buffer) + 1; // Include the newline character
+        
         struct aesd_buffer_entry new_entry;
         new_entry.buffptr = kmalloc(entry_size, GFP_KERNEL);
         if (new_entry.buffptr == NULL) {
@@ -191,14 +194,16 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         //
         //if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
         //    kfree(about_to_be_overwritten->buffptr);
-        if (dev->_circular_buffer.full) {
-            struct aesd_buffer_entry *oldest_entry =
-                &dev->_circular_buffer.entry[dev->_circular_buffer.out_offs];
-            if (oldest_entry->buffptr) {
-                kfree(oldest_entry->buffptr); // Free the oldest entry's buffer
-            }
-            PDEBUG("aesd_write: circular buffer is full, overwriting oldest entry");
-        }
+        
+        //if (dev->_circular_buffer.full) {
+        //    struct aesd_buffer_entry *oldest_entry =
+        //        &dev->_circular_buffer.entry[dev->_circular_buffer.out_offs];
+        //    if (oldest_entry->buffptr) {
+        //        kfree(oldest_entry->buffptr); // Free the oldest entry's buffer
+        //    }
+        //    PDEBUG("aesd_write: circular buffer is full, overwriting oldest entry");
+        //}
+        
         aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
         // Remove the processed data from the partial write buffer

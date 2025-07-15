@@ -85,11 +85,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     // Move in_offs to the next position
     buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;  
     // Check if we have wrapped around and filled the buffer
-    if (buffer->in_offs == buffer->out_offs) {
-        buffer->full = true; // Buffer is now full
-    } else {
-        buffer->full = false; // Buffer is not full
-    }
+    buffer->full = (buffer->in_offs == buffer->out_offs);
 }
 
 /**
