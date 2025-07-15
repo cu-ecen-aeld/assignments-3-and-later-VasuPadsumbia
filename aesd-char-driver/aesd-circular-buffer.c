@@ -57,6 +57,9 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
         // Move to the next entry in the circular buffer
         index = (index + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
         // If we have wrapped around and reached the out_offs, break
+        if (!buffer->full && index == buffer->in_offs) {
+            break; // No more entries to check
+        }
     }
     return NULL;
 }
