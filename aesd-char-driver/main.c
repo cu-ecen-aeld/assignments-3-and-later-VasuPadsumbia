@@ -214,11 +214,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             dev->_partial_write_buffer = NULL; // Reset the partial write buffer
         }
         retval = entry_size; // Return the size of the new entry added
-    } else {
-        // No newline found, just return the size of the data written
-        retval = count;
-        PDEBUG("aesd_write: no newline found, returning count = %zd", retval);
-    }
+    } 
     mutex_unlock(&dev->lock); // Unlock the device
     PDEBUG("aesd_write: lock released");
     // Return the number of bytes written
