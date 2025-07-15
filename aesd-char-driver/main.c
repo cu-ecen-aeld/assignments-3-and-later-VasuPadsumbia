@@ -165,9 +165,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     dev->_partial_write_size = new_size; // Update the size of the partial write buffer
     PDEBUG("aesd_write: partial write buffer updated, size = %zu", dev->_partial_write_size);
     kfree(kbuf); // Free the temporary buffer
-
-    char *newline_pos = memchr(dev->_partial_write_buffer, '\n', dev->_partial_write_size);
-    if (newline_pos) {
+    char *newline_pos = NULL;
+    while ((newline_pos = memchar(dev->_partial_write_buffer, '\n', dev->_partial_write_size))) {
         // Found a newline, we can add the entry to the circular buffer
         size_t entry_size = (newline_pos - dev->_partial_write_buffer) + 1; // Include the newline character
         struct aesd_buffer_entry new_entry;
@@ -180,16 +179,26 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
             mutex_unlock(&dev->lock); // Unlock before returning
             return -ENOMEM; // Memory allocation failed
         }
-        new_entry.size = entry_size;
+        
         // Copy the data up to and including the newline character
         memcpy(new_entry.buffptr, dev->_partial_write_buffer, entry_size);
+        new_entry.size = entry_size;
         // Add the new entry to the circular buffer
-        // ✅ free the overwritten slot if full
-        struct aesd_buffer_entry *about_to_be_overwritten =
-            &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
-
-        if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
-            kfree(about_to_be_overwritten->buffptr);
+        // free the overwritten slot if full
+        //struct aesd_buffer_entry *about_to_be_overwritten =
+        //    &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
+//
+        //if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
+        //    kfree(about_to_be_overwritten->buffptr);
+        if (dev->_circular_buffer.full) {
+            struct aesd_buffer_entry *oldest_entry =
+                &dev->_circular_buffer.entry[dev->_circular_buffer.out_offs];
+            if (oldest_entry->buffptr) {
+                kfree(oldest_entry->buffptr); // Free the oldest entry's buffer
+            }
+            PDEBUG("aesd_write: circular buffer is full, overwriting oldest entry");
+        }
+        aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
         // Remove the processed data from the partial write buffer
         size_t remaining_size = dev->_partial_write_size - entry_size;
