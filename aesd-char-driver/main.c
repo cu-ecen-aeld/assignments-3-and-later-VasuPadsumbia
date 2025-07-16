@@ -206,6 +206,17 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         
         aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
+        int j;
+        for (j = 0; j < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; j++) {
+            struct aesd_buffer_entry *e = &dev->_circular_buffer.entry[j];
+            printk(KERN_DEBUG "aesd_write: circular buffer entry %d: buffptr = %p, size = %zu",
+                   j, e->buffptr, e->size);
+            if (e->buffptr) {
+                printk(KERN_DEBUG "aesd_write: entry %d data: %.*s", j, (int)e->size, e->buffptr);
+            } else {
+                printk(KERN_DEBUG "aesd_write: entry %d is empty", j);
+            }
+        }
         // Remove the processed data from the partial write buffer
         size_t remaining_size = dev->_partial_write_size - entry_size;
         if (remaining_size > 0) {

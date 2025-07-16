@@ -11,6 +11,7 @@
 #ifdef __KERNEL__
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/kernel.h>
 #else
 #include <string.h>
 #endif
@@ -76,23 +77,23 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     /**
     * TODO: implement per description
     */
+   struct aesd_buffer_entry *target = &buffer->entry[buffer->in_offs];
+        
     if (!buffer || !add_entry) {
         return; // Invalid parameters
     }
     // Check if the buffer is full
-    if (buffer->full) {
-        struct aesd_buffer_entry *oldest_entry = &buffer->entry[buffer->out_offs];
-        if (oldest_entry->buffptr != NULL) {
-            kfree(oldest_entry->buffptr); // Free the memory of the oldest entry
-            oldest_entry->buffptr = NULL; // Set pointer to NULL after freeing
-        }
-        // Overwrite the oldest entry
-        buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
-    }   
-    // Add the new entry at the current in_offs position
-    buffer->entry[buffer->in_offs] = *add_entry;
+    if (buffer->full && target->buffptr != NULL) {
+        // If the buffer is full, free the memory of the oldest entry
+        kfree(target->buffptr);
+    }
+    *target = *add_entry; // Copy the new entry into the target location
     // Move in_offs to the next position
     buffer->in_offs = (buffer->in_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;  
+    if (buffer->full) {
+        // If the buffer was full, move out_offs to the next position
+        buffer->out_offs = (buffer->out_offs + 1) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    }
     // Check if we have wrapped around and filled the buffer
     buffer->full = (buffer->in_offs == buffer->out_offs);
 }
@@ -102,5 +103,8 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
 */
 void aesd_circular_buffer_init(struct aesd_circular_buffer *buffer)
 {
+#ifdef __KERNEL__
+    printk(KERN_INFO "aesd_circular_buffer_init: Initializing circular buffer\n");
+#endif
     memset(buffer,0,sizeof(struct aesd_circular_buffer));
 }
