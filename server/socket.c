@@ -114,21 +114,24 @@
 
     void stream_file_reader(int aesd_fd, int client_socket) {
         char buffer[BUFFER_SIZE]; // Buffer to hold the data read from the file
-        ssize_t n =0;
-        size_t i = 0;
-        while(i< sizeof(buffer)-1)
-        {
-            n = read(aesd_fd, buffer + i, sizeof(buffer) - 1 - i); // Read data from file
-            if (n < 0) {
-                LOG_ERR("Failed to read from file: %s", strerror(errno));
-                return; // Return if reading fails
+        ssize_t bytes_read;
+        lseek(aesd_fd, 0, SEEK_SET); // Reset the file pointer to the beginning of the file
+
+        while ((bytes_read = read(aesd_fd, buffer, sizeof(buffer) - 1)) > 0) {
+            ssize_t total_sent = 0; // Variable to keep track of total bytes sent
+            while(total_sent < bytes_read) {
+                ssize_t sent = send(client_socket, buffer + total_sent, bytes_read - total_sent, MSG_NOSIGNAL);
+                if (sent < 0) {
+                    LOG_ERR("Failed to send data to client: %s", strerror(errno));
+                    break; // Break if sending data fails
+                }
+                total_sent += sent;
             }
-            if (buffer[i++] == '\n') break; // Break if end of file is reached
         }
-        if (i > 0) {
-            if (send(client_socket, buffer, i, MSG_NOSIGNAL) < 0) {
-                LOG_ERR("Failed to send data to client: %s", strerror(errno));
-            }
+        if (bytes_read < 0) {
+            LOG_ERR("Failed to read from file: %s", strerror(errno));
+        } else if (bytes_read == 0) {
+            LOG_SYS("End of file reached, no more data to send");
         }
     }
     //void stream_file_reader(const char *filename, int client_socket) {
