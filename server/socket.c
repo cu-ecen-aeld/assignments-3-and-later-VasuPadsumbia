@@ -163,7 +163,7 @@ void *data_processing(void* socket_processing) {
             sp->packet->end_of_packet = true; // Set end_of_packet flag to true if newline is received
             unsigned int x=0, y=0;
             pthread_mutex_lock(sp->packet->mutex); // Lock the mutex for thread safety
-            if (sscanf(sp->packet->data, "%u,%u", &x, &y) == 2 && x < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+            if (sscanf(sp->packet->data, "AESDCHAR_IOCSEEKTO:%u,%u", &x, &y) == 2 && x < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
                 struct aesd_seekto seekto = { .write_cmd = x, .write_cmd_offset = y };
                 int aesd_fd = open(AESD_SOCKET_FILE, O_RDWR);
                 if (ioctl(aesd_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
