@@ -115,7 +115,7 @@
     void stream_file_reader(int aesd_fd, int client_socket) {
         char buffer[BUFFER_SIZE]; // Buffer to hold the data read from the file
         ssize_t bytes_read;
-        lseek(aesd_fd, 0, SEEK_SET); // Reset the file pointer to the beginning of the file
+        //lseek(aesd_fd, 0, SEEK_SET); // Reset the file pointer to the beginning of the file
 
         while ((bytes_read = read(aesd_fd, buffer, sizeof(buffer) - 1)) > 0) {
             ssize_t total_sent = 0; // Variable to keep track of total bytes sent
