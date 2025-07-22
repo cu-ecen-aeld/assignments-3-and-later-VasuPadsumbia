@@ -154,7 +154,7 @@
         char buffer[BUFFER_SIZE] = {0}; // Buffer to hold received data
         ssize_t bytes_received;
         char response[BUFFER_SIZE]; // Buffer to hold the response
-        int aesd_fd = open(AESD_SOCKET_FILE, O_RDWR | O_APPEND);
+        int aesd_fd = open(AESD_SOCKET_FILE, O_RDWR);
         if (aesd_fd < 0) {
             LOG_ERR("Failed to open AESD socket file: %s", strerror(errno));
             return NULL; // Return if opening the socket file fails
