@@ -85,7 +85,10 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
     // Check if the buffer is full
     if (buffer->full && target->buffptr != NULL) {
         // If the buffer is full, free the memory of the oldest entry
-        kfree(target->buffptr);
+        #ifdef __KERNEL__
+            kfree(target->buffptr);
+        #endif
+        target->buffptr = NULL; // Clear the pointer to the old entry
     }
     *target = *add_entry; // Copy the new entry into the target location
     // Move in_offs to the next position
