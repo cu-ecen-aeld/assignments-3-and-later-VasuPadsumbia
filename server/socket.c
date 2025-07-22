@@ -211,13 +211,15 @@
                 pthread_mutex_lock(sp->packet->mutex); // Lock the mutex for thread safety
                 if (sscanf(sp->packet->data, "AESDCHAR_IOCSEEKTO:%u,%u", &x, &y) == 2 && x < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
                     struct aesd_seekto seekto = { .write_cmd = x, .write_cmd_offset = y };
+                    LOG_SYS("Previous file position: %lld", (long long)lseek(aesd_fd, 0, SEEK_CUR)); // Log the previous file position
                     if (ioctl(aesd_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
                         LOG_ERR("Failed to send seekto command: %s", strerror(errno));
                     }
+                    LOG_SYS("Current file position: %lld", (long long)lseek(aesd_fd, 0, SEEK_CUR)); // Log the current file position
                 }
                 else {
                     write_to_file(aesd_fd, sp->packet->data, sp->packet->length); // Write data to file
-                    LOG_SYS("Normal write operation performed");
+                    //LOG_SYS("Normal write operation performed");
                 }
                 pthread_mutex_unlock(sp->packet->mutex); // Unlock the mutex after sending the response
                 //LOG_SYS("Received %zd bytes from client %s:%d", bytes_received, sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port));
