@@ -8,9 +8,10 @@ TARGET = aesdsocket.elf
 endif
 
 CFLAGS ?= -Wall -Wextra -O2 -pthread
+CFLAGS += -I../aesd-char-driver 
 LDFLAGS ?= -pthread
 
-SRC = aesdsocket.c socket.c
+SRC = aesdsocket.c socket.c 
 OBJ = $(SRC:.c=.o)
 
 all: $(TARGET)

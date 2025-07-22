@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <sys/queue.h>
 #include <sys/time.h>
+#include "aesd_ioctl.h"
 
 #define MY_PORT 9000
 #define BACKLOG 10
@@ -109,7 +110,7 @@ void client_handler(void* connection_info);
 void server_handler(void* connection_info); 
 int setup_socket(void* connection_info); // Function to set up the socket and bind it to the specified address and port
 void write_to_file(const char *filename, const char *data, size_t length); // Function to write data to a file
-size_t read_from_file(const char *filename, char *buffer, size_t buffer_size); //
+size_t read_from_file(const char *filename, char *buffer, size_t buffer_size); // Function to read data from a file
 void setup_signal_handlers(); // Function to set up signal handlers for graceful shutdown
 void handle_signal(int signo); // Signal handler function to handle termination signals
 

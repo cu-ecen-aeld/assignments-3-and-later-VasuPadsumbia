@@ -18,6 +18,7 @@
 #include <linux/cdev.h>
 #include <linux/fs.h> // file_operations
 #include "aesdchar.h"
+#include "aesd_ioctl.h"
 
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -187,23 +188,8 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         // Copy the data up to and including the newline character
         memcpy(new_entry.buffptr, dev->_partial_write_buffer, entry_size);
         new_entry.size = entry_size;
+
         // Add the new entry to the circular buffer
-        // free the overwritten slot if full
-        //struct aesd_buffer_entry *about_to_be_overwritten =
-        //    &dev->_circular_buffer.entry[dev->_circular_buffer.in_offs];
-        //
-        //if (dev->_circular_buffer.full && about_to_be_overwritten->buffptr)
-        //    kfree(about_to_be_overwritten->buffptr);
-        
-        //if (dev->_circular_buffer.full) {
-        //    struct aesd_buffer_entry *oldest_entry =
-        //        &dev->_circular_buffer.entry[dev->_circular_buffer.out_offs];
-        //    if (oldest_entry->buffptr) {
-        //        kfree(oldest_entry->buffptr); // Free the oldest entry's buffer
-        //    }
-        //    PDEBUG("aesd_write: circular buffer is full, overwriting oldest entry");
-        //}
-        
         aesd_circular_buffer_add_entry(&dev->_circular_buffer, &new_entry);
         PDEBUG("aesd_write: new entry added to circular buffer, size = %zu", entry_size);
         int j;
@@ -225,7 +211,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         }
         // Update the partial write buffer size
         dev->_partial_write_size = remaining_size;
-        if (remaining_size == 0) {
+        if (remaining_size <= 0) {
             // If no data remains, free the partial write buffer
             kfree(dev->_partial_write_buffer);
             dev->_partial_write_buffer = NULL; // Reset the partial write buffer
@@ -236,22 +222,121 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
     // Return the number of bytes written
     PDEBUG("aesd_write: returning %zd bytes", retval);
     retval = count; // Return the number of bytes written
-    //if (retval < 0) {
-    //    // If there was an error, free the partial write buffer if it exists
-    //    if (dev->_partial_write_buffer) {
-    //        kfree(dev->_partial_write_buffer);
-    //        dev->_partial_write_buffer = NULL; // Reset the partial write buffer
-    //        dev->_partial_write_size = 0; // Reset the size
-    //    }
-    //}
     return retval;
 }
+
+loff_t aesd_llseek(struct file *filp, loff_t offset, int whence)
+{
+    struct aesd_dev *dev = filp->private_data;
+    loff_t new_pos = 0;
+    if (dev == NULL) {
+        PDEBUG("aesd_llseek: private_data is NULL");
+        return -ENODEV; // Device not found
+    }
+    PDEBUG("aesd_llseek: private_data = %p", dev);
+    switch (whence) {
+    case SEEK_SET:
+        new_pos = offset;
+        break;
+    case SEEK_CUR:
+        new_pos = filp->f_pos + offset;
+        break;
+    case SEEK_END:
+        new_pos = AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED + offset;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    if (new_pos < 0)
+        return -EINVAL;
+
+    filp->f_pos = new_pos;
+    return new_pos;
+}
+long aesd_ioctl_set_pos(struct file *filp, struct aesd_dev *dev, unsigned long arg)
+{
+    size_t pos = 0;
+    struct aesd_seekto seekto;
+    if (copy_from_user(&seekto, (struct aesd_seekto __user *)arg, sizeof(seekto))) {
+        PDEBUG("aesd_ioctl_set_pos: copy_from_user failed");
+        return -EFAULT; // Failed to copy data from user space
+    }
+    PDEBUG("aesd_ioctl_set_pos: write_cmd = %u, write_cmd_offset = %u",
+           seekto.write_cmd, seekto.write_cmd_offset);
+    
+    mutex_lock(&dev->lock); // Lock the device for safe access
+    if (seekto.write_cmd >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
+        PDEBUG("aesd_ioctl_set_pos: write_cmd exceeds max supported");
+        mutex_unlock(&dev->lock); // Unlock the device before returning
+        return -EINVAL; // Invalid command
+    }
+    
+    size_t cmd_count =dev->_circular_buffer.full ? AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED : dev->_circular_buffer.in_offs;
+    if (seekto.write_cmd >= cmd_count) {
+        PDEBUG("aesd_ioctl_set_pos: write_cmd exceeds current command count");
+        mutex_unlock(&dev->lock); // Unlock the device before returning
+        return -EINVAL; // Invalid command
+    }
+
+    for (int i=0; i<seekto.write_cmd; i++) {
+        size_t idx = (dev->_circular_buffer.out_offs + i) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+
+        if (dev->_circular_buffer.entry[idx].buffptr == NULL) {
+            PDEBUG("aesd_ioctl_set_pos: write_cmd %u is empty", seekto.write_cmd);
+            mutex_unlock(&dev->lock); // Unlock the device before returning
+            return -EINVAL; // Invalid command
+        }
+        pos += dev->_circular_buffer.entry[idx].size;
+    }
+
+    size_t cmd_idx = (dev->_circular_buffer.out_offs + seekto.write_cmd) % AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED;
+    if (dev->_circular_buffer.entry[cmd_idx].buffptr == NULL || seekto.write_cmd_offset >= dev->_circular_buffer.entry[cmd_idx].size) {
+        PDEBUG("aesd_ioctl_set_pos: write_cmd %u is empty", seekto.write_cmd);
+        mutex_unlock(&dev->lock); // Unlock the device before returning
+        return -EINVAL; // Invalid command
+    }
+    pos += seekto.write_cmd_offset; // Add the offset within the command
+    filp->f_pos = pos; // Set the file position
+    mutex_unlock(&dev->lock); // Unlock the device
+    PDEBUG("aesd_ioctl_set_pos: file position set to %lld", filp->f_pos);
+    return 0; // Success
+}
+
+long unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    struct aesd_dev *dev = filp->private_data;
+    if (dev == NULL) {
+        PDEBUG("unlocked_ioctl: private_data is NULL");
+        return -ENODEV; // Device not found
+    }
+    PDEBUG("unlocked_ioctl: private_data = %p", dev);
+    if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) {
+        PDEBUG("unlocked_ioctl: invalid magic number");
+        return -ENOTTY; // Not a valid ioctl command
+    }
+    if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) {
+        PDEBUG("unlocked_ioctl: command number exceeds max supported");
+        return -ENOTTY; // Not a valid ioctl command    
+    }
+    if (_IOC_NR(cmd) == AESDCHAR_IOCSEEKTO) {
+        PDEBUG("unlocked_ioctl: AESDCHAR_IOCSEEKTO command received");
+        return aesd_ioctl_set_pos(filp, dev, arg);
+    }
+    PDEBUG("unlocked_ioctl: unknown command %u", cmd);
+    return -ENOTTY; // Not a valid ioctl command
+}
+
+
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .llseek =   aesd_llseek,
+    .unlocked_ioctl = unlocked_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
@@ -320,7 +405,6 @@ void aesd_cleanup_module(void)
     }
     kfree(aesd_device._partial_write_buffer); // Free the partial write buffer
     mutex_destroy(&aesd_device.lock); // Destroy the mutex
-    //cdev_del(&aesd_device.cdev); // Delete the character device
     if (aesd_device._device) {
         device_destroy(aesd_device._device->class, MKDEV(aesd_major, aesd_minor));
     }

@@ -112,6 +112,19 @@ void stream_file_reader(const char *filename, int client_socket) {
     fclose(file); // Close the file after reading
 }
 
+int parse_seekto_command(const char *str, unsigned int *cmd, unsigned int *offset)
+{
+    if (strncmp(str, "AESDCHAR_IOCSEEKTO:", 19) != 0) return 0;
+    const char *ptr = str + 19; // Move pointer to the start of the command
+    char *endptr;
+    *cmd = strtoul(ptr, &endptr, 10); // Parse the command number
+    if (endptr == ptr || *endptr != ',') return 0; // Check if command number was parsed correctly
+    ptr = endptr + 1; // Move pointer to the start of the offset
+    *offset = strtoul(ptr, &endptr, 10); // Parse the offset
+    if (endptr == ptr || *endptr != '\0') return 0; // Check if offset was parsed correctly
+    return 1; // Successfully parsed the command and offset
+}
+
 void *data_processing(void* socket_processing) {
     struct socket_processing *sp = (struct socket_processing *)socket_processing;
     if (!sp || !sp->connection_info || !sp->packet) {
@@ -148,8 +161,20 @@ void *data_processing(void* socket_processing) {
         if (strchr(sp->packet->data, '\n'))
         {   
             sp->packet->end_of_packet = true; // Set end_of_packet flag to true if newline is received
+            unsigned int x=0, y=0;
             pthread_mutex_lock(sp->packet->mutex); // Lock the mutex for thread safety
-            write_to_file(AESD_SOCKET_FILE, sp->packet->data, sp->packet->length); // Write data to file
+            if (parse_seekto_command(sp->packet->data, &x, &y)) {
+                struct aesd_seekto seekto = { .write_cmd = x, .write_cmd_offset = y };
+                int aesd_fd = open(AESD_SOCKET_FILE, O_RDWR);
+                if (ioctl(aesd_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
+                    LOG_ERR("Failed to send seekto command: %s", strerror(errno));
+                }
+                close(aesd_fd);
+            }
+            else {
+                write_to_file(AESD_SOCKET_FILE, sp->packet->data, sp->packet->length); // Write data to file
+                LOG_SYS("Normal write operation performed");
+            }
             pthread_mutex_unlock(sp->packet->mutex); // Unlock the mutex after sending the response
             //LOG_SYS("Received %zd bytes from client %s:%d", bytes_received, sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port));
             //LOG_DEBUG("Data: %s", sp->packet->data); // Log the received data
@@ -189,7 +214,6 @@ int setup_socket(void* connection_info) {
     conn_info->_sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (conn_info->_sockfd < 0) {
         LOG_ERR("Failed to create socket: %s", strerror(errno));
-        //free_connection_info(conn_info); // Free the connection info structure
         return -1; // Return if socket creation fails
     }
     
@@ -201,7 +225,6 @@ int setup_socket(void* connection_info) {
     if (setsockopt(conn_info->_sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         LOG_ERR("Failed to set socket options: %s", strerror(errno));
         close(conn_info->_sockfd); // Close the socket
-        //free_connection_info(conn_info); // Free the connection info structure
         return -1; // Return if setting socket options fails
     }
     
