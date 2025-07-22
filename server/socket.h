@@ -24,6 +24,7 @@
 #include <sys/queue.h>
 #include <sys/time.h>
 #include "aesd_ioctl.h"
+#include "aesd-circular-buffer.h"
 
 #define MY_PORT 9000
 #define BACKLOG 10
