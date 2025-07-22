@@ -181,6 +181,14 @@
             LOG_ERR("Failed to open AESD socket file: %s", strerror(errno));
             return NULL; // Return if opening the socket file fails
         }
+        struct stat st;
+        if (fstat(aesd_fd, &st) == -1) {
+            LOG_ERR("Failed to get file status: %s", strerror(errno));
+            close(aesd_fd); // Close the file descriptor before returning
+            return NULL; // Return if getting file status fails
+        }
+        LOG_SYS("Opened fd=%d; s_ISCHR=%d, major=%d, minor=%d\n",
+                aesd_fd, S_ISCHR(st.st_mode), major(st.st_rdev), minor(st.st_rdev));
         while (!exit_requested && sp->connection_active) {
             bytes_received = recv(sp->connection_info->_sockfd, buffer, sizeof(buffer) - 1, 0);
             if (bytes_received < 0) {
@@ -198,7 +206,7 @@
                 pthread_exit(NULL); // Exit the thread if memory allocation fails
                 break;    
             }
-
+            
             memcpy(sp->packet->data + sp->packet->length, buffer, bytes_received);
             sp->packet->length += bytes_received;
             sp->packet->data[sp->packet->length] = '\0'; // Null-terminate the data buffer
@@ -212,6 +220,7 @@
                 if (sscanf(sp->packet->data, "AESDCHAR_IOCSEEKTO:%u,%u", &x, &y) == 2 && x < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
                     struct aesd_seekto seekto = { .write_cmd = x, .write_cmd_offset = y };
                     LOG_SYS("Previous file position: %lld", (long long)lseek(aesd_fd, 0, SEEK_CUR)); // Log the previous file position
+                    LOG_SYS("Trying ioctl: AESDCHAR_IOCSEEKTO=0x%x", AESDCHAR_IOCSEEKTO);
                     if (ioctl(aesd_fd, AESDCHAR_IOCSEEKTO, &seekto) < 0) {
                         LOG_ERR("Failed to send seekto command: %s", strerror(errno));
                     }

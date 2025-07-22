@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <sys/queue.h>
 #include <sys/time.h>
+#include <sys/sysmacros.h>
 #include "aesd_ioctl.h"
 #include "aesd-circular-buffer.h"
 

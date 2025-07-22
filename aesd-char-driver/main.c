@@ -38,6 +38,7 @@ int aesd_open(struct inode *inode, struct file *filp)
     dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
     filp->private_data = dev; // for other methods to access
     PDEBUG("aesd_open: private_data = %p", filp->private_data);
+    PDEBUG("aesd_open: f_op=%p unlocked_ioctl=%p", filp->f_op, filp->f_op->unlocked_ioctl);
     return 0;
 }
 
@@ -311,15 +312,7 @@ long unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
         return -ENODEV; // Device not found
     }
     PDEBUG("unlocked_ioctl: private_data = %p", dev);
-    if (_IOC_TYPE(cmd) != AESD_IOC_MAGIC) {
-        PDEBUG("unlocked_ioctl: invalid magic number");
-        return -ENOTTY; // Not a valid ioctl command
-    }
-    if (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR) {
-        PDEBUG("unlocked_ioctl: command number exceeds max supported");
-        return -ENOTTY; // Not a valid ioctl command    
-    }
-    if (_IOC_NR(cmd) == AESDCHAR_IOCSEEKTO) {
+    if (cmd == AESDCHAR_IOCSEEKTO) {
         PDEBUG("unlocked_ioctl: AESDCHAR_IOCSEEKTO command received");
         return aesd_ioctl_set_pos(filp, dev, arg);
     }
@@ -367,6 +360,7 @@ int aesd_init_module(void)
         return result;
     }
     memset(&aesd_device,0,sizeof(struct aesd_dev));
+    printk(KERN_INFO "aesdchar: module loaded, fops.unlocked_ioctl=%p\n", aesd_fops.unlocked_ioctl);
 
     /**
      * TODO: initialize the AESD specific portion of the device
