@@ -110,8 +110,8 @@ void client_handler(void* connection_info);
 // even if the previous socket is still in the TIME_WAIT state.
 void server_handler(void* connection_info); 
 int setup_socket(void* connection_info); // Function to set up the socket and bind it to the specified address and port
-void write_to_file(const char *filename, const char *data, size_t length); // Function to write data to a file
-size_t read_from_file(const char *filename, char *buffer, size_t buffer_size); // Function to read data from a file
+void write_to_file(int aesd_fd, const char *data, size_t length); // Function to write data to a file
+size_t read_from_file(int aesd_fd, char *buffer, size_t buffer_size); // Function to read data from a file
 void setup_signal_handlers(); // Function to set up signal handlers for graceful shutdown
 void handle_signal(int signo); // Signal handler function to handle termination signals
 
