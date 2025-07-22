@@ -115,6 +115,6 @@ size_t read_from_file(int aesd_fd, char *buffer, size_t buffer_size); // Functio
 void setup_signal_handlers(); // Function to set up signal handlers for graceful shutdown
 void handle_signal(int signo); // Signal handler function to handle termination signals
 
-void stream_file_reader(const char *filename, int client_socket); // Function to read a file and stream its content to the client
+void stream_file_reader(int aesd_fd, int client_socket); // Function to read a file and stream its content to the client
 struct connection_info *create_connection_info(int sockfd, struct sockaddr_in *addr, char *ip);
 #endif // CLIENT_H

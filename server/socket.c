@@ -112,24 +112,37 @@
         pthread_exit(NULL); // Exit the thread when exit is requested
     }
 
-    void stream_file_reader(const char *filename, int client_socket) {
-        FILE *file = fopen(filename, "r");
-        if (!file) {
-            LOG_ERR("Failed to open file %s for reading: %s", filename, strerror(errno));
-            return; // Return if file opening fails
-        }
-        
-        char buffer[BUFFER_SIZE];
+    void stream_file_reader(int aesd_fd, int client_socket) {
+        char buffer[BUFFER_SIZE]; // Buffer to hold the data read from the file
         size_t bytes_read;
-        while ((bytes_read = fread(buffer, sizeof(char), sizeof(buffer) - 1, file)) > 0) {
+        while ((bytes_read = read_from_file(aesd_fd, buffer, sizeof(buffer))) > 0) {
             if (send(client_socket, buffer, bytes_read, MSG_NOSIGNAL) < 0) {
                 LOG_ERR("Failed to send data to client: %s", strerror(errno));
                 break; // Break if sending data fails
             }
         }
-        
-        fclose(file); // Close the file after reading
+        if (bytes_read < 0) {
+            LOG_ERR("Failed to read from file: %s", strerror(errno));
+        }
     }
+    //void stream_file_reader(const char *filename, int client_socket) {
+    //    FILE *file = fopen(filename, "r");
+    //    if (!file) {
+    //        LOG_ERR("Failed to open file %s for reading: %s", filename, strerror(errno));
+    //        return; // Return if file opening fails
+    //    }
+    //    
+    //    char buffer[BUFFER_SIZE];
+    //    size_t bytes_read;
+    //    while ((bytes_read = fread(buffer, sizeof(char), sizeof(buffer) - 1, file)) > 0) {
+    //        if (send(client_socket, buffer, bytes_read, MSG_NOSIGNAL) < 0) {
+    //            LOG_ERR("Failed to send data to client: %s", strerror(errno));
+    //            break; // Break if sending data fails
+    //        }
+    //    }
+    //    
+    //    fclose(file); // Close the file after reading
+    //}
 
     int parse_seekto_command(const char *str, unsigned int *cmd, unsigned int *offset)
     {
@@ -206,14 +219,14 @@
                 sp->connection_active = false; // Set connection_active flag to false
                 pthread_mutex_lock(sp->packet->mutex); // Lock the mutex for thread safety
                 // Stream the file content to the client
-                //stream_file_reader(AESD_SOCKET_FILE, sp->connection_info->_sockfd); // Stream the file content to the client
+                stream_file_reader(aesd_fd, sp->connection_info->_sockfd); // Stream the file content to the client
                 
                 // Read the file and send the response to the client seperately for multiple servers
-                size_t bytes_read = read_from_file(aesd_fd, response, sizeof(response)); // Read data from file
+                //size_t bytes_read = read_from_file(aesd_fd, response, sizeof(response)); // Read data from file
                 //LOG_DEBUG("Response: %s", response); // Log the response data
-                if (send(sp->connection_info->_sockfd, response, bytes_read, MSG_NOSIGNAL) < 0) {
-                    LOG_ERR("Failed to send response to client %s:%d: %s", sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port), strerror(errno));
-                }
+                //if (send(sp->connection_info->_sockfd, response, bytes_read, MSG_NOSIGNAL) < 0) {
+                //    LOG_ERR("Failed to send response to client %s:%d: %s", sp->connection_info->_ip, ntohs(sp->connection_info->_addr.sin_port), strerror(errno));
+                //}
                 pthread_mutex_unlock(sp->packet->mutex); // Unlock the mutex after sending the response
             }
         }   
